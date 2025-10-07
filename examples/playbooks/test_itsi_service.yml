@@ -55,7 +55,7 @@
       failed_when: false
       tags: [setup, cleanup]
 
-    - name: "⏱️ PAUSE: Allow cleanup to complete"
+    - name: "PAUSE: Allow cleanup to complete"
       ansible.builtin.pause:
         seconds: 1
 
@@ -63,13 +63,13 @@
     # TEST 1: BASIC CREATE OPERATIONS
     # =============================================================================
 
-    - name: "📝 TEST 1.1: CREATE - Minimal service (name only)"
+    - name: "TEST 1.1: CREATE - Minimal service (name only)"
       splunk.itsi.itsi_service:
         name: "{{ test_services.minimal.name }}"
         state: present
       register: create_minimal
 
-    - name: "✅ VERIFY 1.1: Minimal service creation"
+    - name: "VERIFY 1.1: Minimal service creation"
       ansible.builtin.assert:
         that:
           - create_minimal.status == 200
@@ -77,9 +77,9 @@
           - "'title' in create_minimal.changed_fields"
           - "create_minimal.service._key is defined"
         fail_msg: "Minimal service creation failed"
-        success_msg: "✅ Minimal service created successfully"
+        success_msg: "Minimal service created successfully"
 
-    - name: "📝 TEST 1.2: CREATE - Full service (all fields)"
+    - name: "TEST 1.2: CREATE - Full service (all fields)"
       splunk.itsi.itsi_service:
         name: "{{ test_services.full.name }}"
         enabled: "{{ test_services.full.enabled }}"
@@ -91,7 +91,7 @@
         state: present
       register: create_full
 
-    - name: "✅ VERIFY 1.2: Full service creation"
+    - name: "VERIFY 1.2: Full service creation"
       ansible.builtin.assert:
         that:
           - create_full.status == 200
@@ -109,13 +109,13 @@
     # TEST 2: IDEMPOTENCY TESTING
     # =============================================================================
 
-    - name: "🔄 TEST 2.1: IDEMPOTENT - Repeat minimal service creation"
+    - name: "TEST 2.1: IDEMPOTENT - Repeat minimal service creation"
       splunk.itsi.itsi_service:
         name: "{{ test_services.minimal.name }}"
         state: present
       register: idempotent_minimal
 
-    - name: "✅ VERIFY 2.1: Minimal service idempotency"
+    - name: "VERIFY 2.1: Minimal service idempotency"
       ansible.builtin.assert:
         that:
           - idempotent_minimal.status == 200
@@ -124,7 +124,7 @@
         fail_msg: "Minimal service idempotency failed"
         success_msg: "✅ Minimal service idempotency verified"
 
-    - name: "🔄 TEST 2.2: IDEMPOTENT - Repeat full service creation"
+    - name: "TEST 2.2: IDEMPOTENT - Repeat full service creation"
       splunk.itsi.itsi_service:
         name: "{{ test_services.full.name }}"
         enabled: "{{ test_services.full.enabled }}"
@@ -138,20 +138,20 @@
         state: present
       register: idempotent_full
 
-    - name: "✅ VERIFY 2.2: Full service idempotency"
+    - name: "VERIFY 2.2: Full service idempotency"
       ansible.builtin.assert:
         that:
           - idempotent_full.status == 200
           - idempotent_full.changed == false
           - "idempotent_full.changed_fields == []"
         fail_msg: "Full service idempotency failed"
-        success_msg: "✅ Full service idempotency verified"
+        success_msg: "Full service idempotency verified"
 
     # =============================================================================
     # TEST 3: UPDATE OPERATIONS AND CHANGE DETECTION
     # =============================================================================
 
-    - name: "📝 TEST 3.1: CREATE - Service for update testing"
+    - name: "TEST 3.1: CREATE - Service for update testing"
       splunk.itsi.itsi_service:
         name: "{{ test_services.update_test.name }}"
         enabled: "{{ test_services.update_test.enabled }}"
@@ -159,7 +159,7 @@
         state: present
       register: create_for_update
 
-    - name: "📝 TEST 3.2: UPDATE - Single field (description)"
+    - name: "TEST 3.2: UPDATE - Single field (description)"
       splunk.itsi.itsi_service:
         name: "{{ test_services.update_test.name }}"
         # Don't explicitly set enabled to test only description change
@@ -167,16 +167,16 @@
         state: present
       register: update_description
 
-    - name: "✅ VERIFY 3.2: Single field update"
+    - name: "VERIFY 3.2: Single field update"
       ansible.builtin.assert:
         that:
           - update_description.status == 200
           - update_description.changed == true
           - "update_description.changed_fields == ['description']"
         fail_msg: "Single field update failed"
-        success_msg: "✅ Single field update successful"
+        success_msg: "Single field update successful"
 
-    - name: "📝 TEST 3.3: CREATE - Fresh service for multiple field testing"
+    - name: "TEST 3.3: CREATE - Fresh service for multiple field testing"
       splunk.itsi.itsi_service:
         name: "{{ base_service_name }}-multifield"
         enabled: false
@@ -184,7 +184,7 @@
         state: present
       register: create_multifield
 
-    - name: "📝 TEST 3.4: UPDATE - Multiple fields"
+    - name: "TEST 3.4: UPDATE - Multiple fields"
       splunk.itsi.itsi_service:
         name: "{{ base_service_name }}-multifield"
         enabled: true  # Changed from false
@@ -195,7 +195,7 @@
         state: present
       register: update_multiple
 
-    - name: "🔍 DEBUG 3.4: Show update_multiple details"
+    - name: "DEBUG 3.4: Show update_multiple details"
       ansible.builtin.debug:
         msg:
           - "Status: {{ update_multiple.status }}"
@@ -203,7 +203,7 @@
           - "Changed fields: {{ update_multiple.changed_fields }}"
           - "Expected fields: ['enabled', 'description', 'service_tags']"
 
-    - name: "✅ VERIFY 3.4: Multiple field update"
+    - name: "VERIFY 3.4: Multiple field update"
       ansible.builtin.assert:
         that:
           - update_multiple.status == 200
@@ -212,9 +212,9 @@
           - "'description' in update_multiple.changed_fields"
           - "'service_tags' in update_multiple.changed_fields"
         fail_msg: "Multiple field update failed - see debug above"
-        success_msg: "✅ Multiple field update successful"
+        success_msg: "Multiple field update successful"
 
-    - name: "📝 TEST 3.5: UPDATE - Entity rules change"
+    - name: "TEST 3.5: UPDATE - Entity rules change"
       splunk.itsi.itsi_service:
         name: "{{ test_services.update_test.name }}"
         entity_rules:
@@ -231,7 +231,7 @@
         state: present
       register: update_entity_rules
 
-    - name: "🔍 DEBUG 3.5: Show entity rules update details"
+    - name: "DEBUG 3.5: Show entity rules update details"
       ansible.builtin.debug:
         msg:
           - "Status: {{ update_entity_rules.status }}"
@@ -239,7 +239,7 @@
           - "Changed fields: {{ update_entity_rules.changed_fields }}"
           - "Changed fields length: {{ update_entity_rules.changed_fields | length }}"
 
-    - name: "✅ VERIFY 3.5: Entity rules update"
+    - name: "VERIFY 3.5: Entity rules update"
       ansible.builtin.assert:
         that:
           - update_entity_rules.status == 200
@@ -247,13 +247,13 @@
           - "'entity_rules' in update_entity_rules.changed_fields"
           - "update_entity_rules.changed_fields | length == 1"
         fail_msg: "Entity rules update failed - see debug above"
-        success_msg: "✅ Entity rules update successful"
+        success_msg: "Entity rules update successful"
 
     # =============================================================================
     # TEST 4: SERVICE KEY OPERATIONS
     # =============================================================================
 
-    - name: "📝 TEST 4.1: CREATE - Service to test key-based operations"
+    - name: "TEST 4.1: CREATE - Service to test key-based operations"
       splunk.itsi.itsi_service:
         name: "{{ base_service_name }}-key-test"
         description: "Service for key-based testing"
@@ -261,7 +261,7 @@
         state: present
       register: create_for_key_test
 
-    - name: "📝 TEST 4.2: UPDATE - By service key instead of name"
+    - name: "TEST 4.2: UPDATE - By service key instead of name"
       splunk.itsi.itsi_service:
         service_key: "{{ create_for_key_test.service._key }}"
         description: "UPDATED via service key"
@@ -269,7 +269,7 @@
         state: present
       register: update_by_key
 
-    - name: "✅ VERIFY 4.2: Update by service key"
+    - name: "VERIFY 4.2: Update by service key"
       ansible.builtin.assert:
         that:
           - update_by_key.status == 200
@@ -277,19 +277,19 @@
           - "'description' in update_by_key.changed_fields"
           - "'enabled' in update_by_key.changed_fields"
         fail_msg: "Update by service key failed"
-        success_msg: "✅ Update by service key successful"
+        success_msg: "Update by service key successful"
 
     # =============================================================================
     # TEST 5: DELETE OPERATIONS
     # =============================================================================
 
-    - name: "🗑️ TEST 5.1: DELETE - Service by name"
+    - name: "TEST 5.1: DELETE - Service by name"
       splunk.itsi.itsi_service:
         name: "{{ test_services.minimal.name }}"
         state: absent
       register: delete_by_name
 
-    - name: "✅ VERIFY 5.1: Delete by name"
+    - name: "VERIFY 5.1: Delete by name"
       ansible.builtin.assert:
         that:
           - delete_by_name.status == 204  # DELETE operations return 204 No Content
@@ -297,49 +297,49 @@
           - "'_deleted' in delete_by_name.changed_fields"
           - "delete_by_name.service is none"
         fail_msg: "Delete by name failed"
-        success_msg: "✅ Delete by name successful"
+        success_msg: "Delete by name successful"
 
-    - name: "🗑️ TEST 5.2: DELETE - Service by key"
+    - name: "TEST 5.2: DELETE - Service by key"
       splunk.itsi.itsi_service:
         service_key: "{{ create_for_key_test.service._key }}"
         state: absent
       register: delete_by_key
 
-    - name: "✅ VERIFY 5.2: Delete by key"
+    - name: "VERIFY 5.2: Delete by key"
       ansible.builtin.assert:
         that:
           - delete_by_key.status == 204  # DELETE operations return 204 No Content
           - delete_by_key.changed == true
           - "'_deleted' in delete_by_key.changed_fields"
         fail_msg: "Delete by key failed"
-        success_msg: "✅ Delete by key successful"
+        success_msg: "Delete by key successful"
 
-    - name: "🔄 TEST 5.3: DELETE - Idempotent delete (already deleted)"
+    - name: "TEST 5.3: DELETE - Idempotent delete (already deleted)"
       splunk.itsi.itsi_service:
         name: "{{ test_services.minimal.name }}"
         state: absent
       register: delete_idempotent
 
-    - name: "✅ VERIFY 5.3: Idempotent delete"
+    - name: "VERIFY 5.3: Idempotent delete"
       ansible.builtin.assert:
         that:
           - delete_idempotent.status in [200, 204]  # DELETE: 204 for actual delete, 200 for idempotent
           - delete_idempotent.changed == false
           - "delete_idempotent.changed_fields == []"
         fail_msg: "Idempotent delete failed"
-        success_msg: "✅ Idempotent delete successful"
+        success_msg: "Idempotent delete successful"
 
     # =============================================================================
     # TEST 6: ERROR HANDLING AND EDGE CASES
     # =============================================================================
 
-    - name: "⚠️ TEST 6.1: ERROR - Delete non-existent service"
+    - name: "TEST 6.1: ERROR - Delete non-existent service"
       splunk.itsi.itsi_service:
         name: "{{ base_service_name }}-nonexistent"
         state: absent
       register: delete_nonexistent
 
-    - name: "✅ VERIFY 6.1: Delete non-existent service handling"
+    - name: "VERIFY 6.1: Delete non-existent service handling"
       ansible.builtin.assert:
         that:
           - delete_nonexistent.changed == false
@@ -347,25 +347,25 @@
         fail_msg: "Delete non-existent service handling failed"
         success_msg: "✅ Delete non-existent service handled correctly"
 
-    - name: "⚠️ TEST 6.2: ERROR - Create without name or service_key"
+    - name: "TEST 6.2: ERROR - Create without name or service_key"
       splunk.itsi.itsi_service:
         description: "Service without name or key"
         state: present
       register: create_without_identifier
       failed_when: false
 
-    - name: "✅ VERIFY 6.2: Create without identifier error handling"
+    - name: "VERIFY 6.2: Create without identifier error handling"
       ansible.builtin.assert:
         that:
           - "'one of the following is required' in create_without_identifier.msg"
         fail_msg: "Create without identifier should show validation error"
-        success_msg: "✅ Create without identifier correctly rejected"
+        success_msg: "Create without identifier correctly rejected"
 
     # =============================================================================
     # TEST 7: CHECK MODE TESTING
     # =============================================================================
 
-    - name: "🔍 TEST 7.1: CHECK MODE - Create operation"
+    - name: "TEST 7.1: CHECK MODE - Create operation"
       splunk.itsi.itsi_service:
         name: "{{ base_service_name }}-check-mode"
         description: "Check mode test service"
@@ -374,7 +374,7 @@
       check_mode: true
       register: check_mode_create
 
-    - name: "✅ VERIFY 7.1: Check mode create"
+    - name: "VERIFY 7.1: Check mode create"
       ansible.builtin.assert:
         that:
           - check_mode_create.changed == true
@@ -383,9 +383,9 @@
           - "'description' in check_mode_create.diff.after"
           - "'enabled' in check_mode_create.diff.after"
         fail_msg: "Check mode create failed"
-        success_msg: "✅ Check mode create successful"
+        success_msg: "Check mode create successful"
 
-    - name: "🔍 TEST 7.2: CHECK MODE - Update operation"
+    - name: "TEST 7.2: CHECK MODE - Update operation"
       splunk.itsi.itsi_service:
         name: "{{ test_services.full.name }}"
         description: "CHECK MODE - Updated description"
@@ -394,7 +394,7 @@
       check_mode: true
       register: check_mode_update
 
-    - name: "✅ VERIFY 7.2: Check mode update"
+    - name: "VERIFY 7.2: Check mode update"
       ansible.builtin.assert:
         that:
           - check_mode_update.changed == true
@@ -403,29 +403,29 @@
           - "check_mode_update.diff.before is defined"
           - "check_mode_update.diff.after is defined"
         fail_msg: "Check mode update failed"
-        success_msg: "✅ Check mode update successful"
+        success_msg: "Check mode update successful"
 
-    - name: "🔍 TEST 7.3: CHECK MODE - Delete operation"
+    - name: "TEST 7.3: CHECK MODE - Delete operation"
       splunk.itsi.itsi_service:
         name: "{{ test_services.full.name }}"
         state: absent
       check_mode: true
       register: check_mode_delete
 
-    - name: "✅ VERIFY 7.3: Check mode delete"
+    - name: "VERIFY 7.3: Check mode delete"
       ansible.builtin.assert:
         that:
           - check_mode_delete.changed == true
           - "check_mode_delete.diff.before is defined"
           - "check_mode_delete.diff.after == {}"
         fail_msg: "Check mode delete failed"
-        success_msg: "✅ Check mode delete successful"
+        success_msg: "Check mode delete successful"
 
     # =============================================================================
     # TEST 8: EXTRA FIELDS FUNCTIONALITY
     # =============================================================================
 
-    - name: "📝 TEST 8.1: CREATE - Service with extra fields"
+    - name: "TEST 8.1: CREATE - Service with extra fields"
       splunk.itsi.itsi_service:
         name: "{{ base_service_name }}-extra"
         description: "Service with extra fields"
@@ -436,7 +436,7 @@
         state: present
       register: create_with_extra
 
-    - name: "✅ VERIFY 8.1: Create with extra fields"
+    - name: "VERIFY 8.1: Create with extra fields"
       ansible.builtin.assert:
         that:
           - create_with_extra.status == 200
@@ -445,9 +445,9 @@
           - "'custom_field_2' in create_with_extra.changed_fields"
           - "'custom_field_3' in create_with_extra.changed_fields"
         fail_msg: "Create with extra fields failed"
-        success_msg: "✅ Create with extra fields successful"
+        success_msg: "Create with extra fields successful"
 
-    - name: "📝 TEST 8.2: UPDATE - Modify extra fields"
+    - name: "TEST 8.2: UPDATE - Modify extra fields"
       splunk.itsi.itsi_service:
         name: "{{ base_service_name }}-extra"
         description: "Service with extra fields"
@@ -465,7 +465,7 @@
           - "Changed: {{ update_extra_fields.changed }}"
           - "Changed fields: {{ update_extra_fields.changed_fields }}"
 
-    - name: "✅ VERIFY 8.2: Update extra fields"
+    - name: "VERIFY 8.2: Update extra fields"
       ansible.builtin.assert:
         that:
           - update_extra_fields.status == 200
@@ -474,13 +474,13 @@
           - "'custom_field_4' in update_extra_fields.changed_fields"
           - "'custom_field_3' in update_extra_fields.changed_fields"  # Removed field
         fail_msg: "Update extra fields failed"
-        success_msg: "✅ Update extra fields successful"
+        success_msg: "Update extra fields successful"
 
     # =============================================================================
     # TEST 9: SERVICE TAGS EDGE CASES
     # =============================================================================
 
-    - name: "📝 TEST 9.1: CREATE - Service with empty service_tags"
+    - name: "TEST 9.1: CREATE - Service with empty service_tags"
       splunk.itsi.itsi_service:
         name: "{{ base_service_name }}-empty-tags"
         service_tags:
@@ -489,7 +489,7 @@
         state: present
       register: create_empty_tags
 
-    - name: "📝 TEST 9.2: UPDATE - Add tags to empty service_tags"
+    - name: "TEST 9.2: UPDATE - Add tags to empty service_tags"
       splunk.itsi.itsi_service:
         name: "{{ base_service_name }}-empty-tags"
         service_tags:
@@ -498,15 +498,15 @@
         state: present
       register: update_add_tags
 
-    - name: "✅ VERIFY 9.2: Add tags to empty service_tags"
+    - name: "VERIFY 9.2: Add tags to empty service_tags"
       ansible.builtin.assert:
         that:
           - update_add_tags.changed == true
           - "'service_tags' in update_add_tags.changed_fields"
         fail_msg: "Add tags to empty service_tags failed"
-        success_msg: "✅ Add tags to empty service_tags successful"
+        success_msg: "Add tags to empty service_tags successful"
 
-    - name: "📝 TEST 9.3: UPDATE - Remove all tags"
+    - name: "TEST 9.3: UPDATE - Remove all tags"
       splunk.itsi.itsi_service:
         name: "{{ base_service_name }}-empty-tags"
         service_tags:
@@ -515,79 +515,79 @@
         state: present
       register: update_remove_tags
 
-    - name: "✅ VERIFY 9.3: Remove all tags"
+    - name: "VERIFY 9.3: Remove all tags"
       ansible.builtin.assert:
         that:
           - update_remove_tags.changed == true
           - "'service_tags' in update_remove_tags.changed_fields"
         fail_msg: "Remove all tags failed"
-        success_msg: "✅ Remove all tags successful"
+        success_msg: Remove all tags successful"
 
     # =============================================================================
     # TEST 10: BOOLEAN AND NUMERIC HANDLING
     # =============================================================================
 
-    - name: "📝 TEST 10.1: CREATE - Service with enabled=false"
+    - name: "TEST 10.1: CREATE - Service with enabled=false"
       splunk.itsi.itsi_service:
         name: "{{ base_service_name }}-bool-test"
         enabled: false
         state: present
       register: create_disabled
 
-    - name: "📝 TEST 10.2: UPDATE - Toggle enabled false -> true"
+    - name: "TEST 10.2: UPDATE - Toggle enabled false -> true"
       splunk.itsi.itsi_service:
         name: "{{ base_service_name }}-bool-test"
         enabled: true
         state: present
       register: update_enable
 
-    - name: "✅ VERIFY 10.2: Toggle enabled false -> true"
+    - name: "VERIFY 10.2: Toggle enabled false -> true"
       ansible.builtin.assert:
         that:
           - update_enable.changed == true
           - "'enabled' in update_enable.changed_fields"
           - "update_enable.changed_fields | length == 1"
         fail_msg: "Toggle enabled false -> true failed"
-        success_msg: "✅ Toggle enabled false -> true successful"
+        success_msg: "Toggle enabled false -> true successful"
 
-    - name: "📝 TEST 10.3: UPDATE - Test numeric 1/0 vs boolean true/false"
+    - name: "TEST 10.3: UPDATE - Test numeric 1/0 vs boolean true/false"
       splunk.itsi.itsi_service:
         name: "{{ base_service_name }}-bool-test"
         enabled: 1  # Should be equivalent to true
         state: present
       register: update_numeric_enabled
 
-    - name: "✅ VERIFY 10.3: Numeric 1 equivalent to boolean true"
+    - name: "VERIFY 10.3: Numeric 1 equivalent to boolean true"
       ansible.builtin.assert:
         that:
           - update_numeric_enabled.changed == false
           - "update_numeric_enabled.changed_fields == []"
         fail_msg: "Numeric 1 not equivalent to boolean true"
-        success_msg: "✅ Numeric 1 correctly equivalent to boolean true"
+        success_msg: "Numeric 1 correctly equivalent to boolean true"
 
     # =============================================================================
     # FINAL SUMMARY AND CLEANUP
     # =============================================================================
 
-    - name: "📊 TEST SUMMARY"
+    - name: "TEST SUMMARY"
       ansible.builtin.debug:
         msg:
-          - "🎉 ===== ITSI SERVICE MODULE COMPREHENSIVE TEST RESULTS ====="
-          - "✅ CREATE Operations: Minimal, Full, With Extra Fields"
-          - "✅ UPDATE Operations: Single Field, Multiple Fields, Entity Rules"
-          - "✅ DELETE Operations: By Name, By Key, Idempotent Delete"
-          - "✅ IDEMPOTENCY: All operations properly detect no-change scenarios"
-          - "✅ CHECK MODE: Proper diff reporting without actual changes"
-          - "✅ ERROR HANDLING: Graceful handling of edge cases"
-          - "✅ SERVICE_TAGS: Empty tags, add/remove operations"
-          - "✅ BOOLEAN HANDLING: True/false and 1/0 equivalence"
-          - "✅ SERVICE KEY: Operations using key instead of name"
-          - "✅ EXTRA FIELDS: Custom field management"
+          - "===== ITSI SERVICE MODULE COMPREHENSIVE TEST RESULTS ====="
+          - "CREATE Operations: Minimal, Full, With Extra Fields"
+          - "UPDATE Operations: Single Field, Multiple Fields, Entity Rules"
+          - "DELETE Operations: By Name, By Key, Idempotent Delete"
+          - "IDEMPOTENCY: All operations properly detect no-change scenarios"
+          - "CHECK MODE: Proper diff reporting without actual changes"
+          - "ERROR HANDLING: Graceful handling of edge cases"
+          - "SERVICE_TAGS: Empty tags, add/remove operations"
+          - "BOOLEAN HANDLING: True/false and 1/0 equivalence"
+          - "SERVICE KEY: Operations using key instead of name"
+          - "EXTRA FIELDS: Custom field management"
           - ""
-          - "🚀 ALL TESTS COMPLETED SUCCESSFULLY!"
-          - "📈 Total Test Categories: 10"
-          - "🔍 Change Detection: VERIFIED"
-          - "🎯 HTTP Status Codes: All 200 (Success)"
+          - "ALL TESTS COMPLETED SUCCESSFULLY!"
+          - "Total Test Categories: 10"
+          - "Change Detection: VERIFIED"
+          - "HTTP Status Codes: All 200 (Success)"
 
     - name: "🧹 FINAL CLEANUP: Remove all test services"
       splunk.itsi.itsi_service:

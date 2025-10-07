@@ -27,12 +27,12 @@
       when: ansible_httpapi_headers is defined and 'Authorization' in ansible_httpapi_headers and false
 
   tasks:
-    - name: A1) List all services (baseline)
+    - name: 1) List all services (baseline)
       splunk.itsi.itsi_service_info:
         enabled: true
       register: svc_all
 
-    - name: Assert A1 returned a list and status
+    - name: Assert 1 returned a list and status
       ansible.builtin.assert:
         that:
           - svc_all is defined
@@ -54,13 +54,13 @@
           key: "{{ ref_key }}"
           title: "{{ ref_title }}"
 
-    - name: A2) List with filter by exact title
+    - name: 2) List with filter by exact title
       splunk.itsi.itsi_service_info:
         title: "{{ ref_title }}"
         fields: "{{ common_fields + ['description', 'service_tags', 'entity_rules', 'base_service_template_id'] }}"
       register: svc_by_title
 
-    - name: Assert A2 returns exactly one and matches title
+    - name: Assert 2 returns exactly one and matches title
       ansible.builtin.assert:
         that:
           - svc_by_title.status | int == 200
@@ -68,13 +68,13 @@
           - (svc_by_title['items'][0].title | string) == (ref_title | string)
         success_msg: "Exact-title filter returned a single correct match."
 
-    - name: A3) GET by key (partial view)
+    - name: 3) GET by key (partial view)
       splunk.itsi.itsi_service_info:
         service_key: "{{ ref_key }}"
         fields: "{{ common_fields + ['entity_rules', 'permissions'] }}"
       register: svc_by_key
 
-    - name: Assert A3 returns one with same key
+    - name: Assert 3 returns one with same key
       ansible.builtin.assert:
         that:
           - svc_by_key.status | int == 200
@@ -92,7 +92,7 @@
           - "svc_by_key.service.entity_rules is not defined or svc_by_key.service.entity_rules is iterable"
         success_msg: "Field shapes look good (enabled/sec_grp/entity_rules)."
 
-    - name: A4 Projection only minimal fields
+    - name: 4 Projection only minimal fields
       splunk.itsi.itsi_service_info:
         service_key: "{{ ref_key }}"
         fields: "{{ common_fields }}"
@@ -111,13 +111,13 @@
           - "'sec_grp' in keys_present"
         success_msg: "Projection with minimal fields returned expected keys."
 
-    - name: A5) GET non-existent key (expect message & non-200)
+    - name: 5) GET non-existent key (expect message & non-200)
       splunk.itsi.itsi_service_info:
         service_key: "does-not-exist-{{ 999999 | random }}"
       register: svc_missing
       ignore_errors: true
 
-    - name: Assert A5 produced an error shape (module should not crash)
+    - name: Assert 5 produced an error shape (module should not crash)
       ansible.builtin.assert:
         that:
           - svc_missing.status is defined
@@ -128,7 +128,7 @@
 
     - name: Test pagination functionality
       block:
-        - name: Optional A6) Pagination smoke test (run only if > 3 services)
+        - name: Optional 6) Pagination smoke test (run only if > 3 services)
           when: svc_all['items'] | length > 3
           splunk.itsi.itsi_service_info:
             enabled: true
@@ -149,7 +149,7 @@
           ansible.builtin.debug:
             msg: "Pagination parameters not supported by server/module or not needed; skipping."
 
-    - name: A7) Re-verify list remains stable (no unintended changes)
+    - name: 7) Re-verify list remains stable (no unintended changes)
       splunk.itsi.itsi_service_info:
         enabled: true
       register: svc_all_2

@@ -283,7 +283,7 @@
     - name: "=== TEST SUMMARY ==="
       ansible.builtin.debug:
         msg: |
-          ✅ All CRUD operations completed successfully!
+          All CRUD operations completed successfully!
 
           Test Results Summary:
           • List operations: ✅
@@ -294,5 +294,3 @@
           • Error handling: ✅
           • Check mode: ✅
           • Idempotency: ✅
-
-          The itsi_correlation_search module is working correctly!

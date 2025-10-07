@@ -126,10 +126,10 @@
       ansible.builtin.debug:
         msg:
           - "=== Connection Details ==="
-          - "HTTP Status Access: ✅ Available ({{ list_result.status }})"
-          - "Raw Response Access: ✅ Available"
+          - "HTTP Status Access: Available ({{ list_result.status }})"
+          - "Raw Response Access: Available"
           - "Episode Data Type: {{ list_result.episodes | type_debug }}"
-          - "Enhanced Envelope: ✅ Working"
+          - "Enhanced Envelope: Working"
           - "Authentication: Bearer Token"
           - "SSL: {{ ansible_httpapi_use_ssl | default('unknown') }}"
           - "Port: {{ ansible_httpapi_port | default('unknown') }}"
