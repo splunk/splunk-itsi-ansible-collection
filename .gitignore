@@ -168,6 +168,8 @@ cython_debug/
 galaxy.yml.bak
 *.retry
 .galaxy_install_info
+tests/integration
+tests/unit
 tests/output/
 tests/tmp/
 test-requirements.txt
@@ -199,3 +201,6 @@ debug.log
 *_local.*
 examples/inventory/*.local
 examples/**/*_local.*
+
+# GitHub workflows (to be added separately)
+.github/
