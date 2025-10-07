@@ -1,0 +1,42 @@
+---
+# List ITSI episodes, print total count, and show the first episode.
+# Usage:
+#   ANSIBLE_COLLECTIONS_PATHS="$(pwd)/.ansible/collections" \
+#   ansible-playbook -i examples/inventory/hosts.ini examples/playbooks/itsi_list_episodes.yml
+# Optional:
+#   -e 'filter_data={"status":"2"}'
+#   -e 'limit=10 sort_key=create_time sort_dir=1'
+
+- name: List ITSI episodes and show summary
+  hosts: splunk
+  gather_facts: false
+
+  tasks:
+    - name: List episodes (optionally filtered/sorted)
+      splunk.itsi.notable_event_group_info:
+        limit: "{{ limit | default(omit, true) }}"
+        skip: "{{ skip | default(omit, true) }}"
+        fields: "{{ fields | default(omit, true) }}"
+        filter_data: "{{ filter_data | default(omit, true) }}"
+        sort_key: "{{ sort_key | default(omit, true) }}"
+        sort_dir: "{{ sort_dir | default(omit, true) }}"
+      register: list_out
+
+    - name: Show HTTP status
+      ansible.builtin.debug:
+        var: list_out.status
+
+    - name: Compute total episodes returned
+      ansible.builtin.set_fact:
+        episode_count: "{{ (list_out.episodes | default([])) | length }}"
+
+    - name: Show total episodes and first episode (if any)
+      ansible.builtin.debug:
+        msg:
+          count: "{{ episode_count }}"
+          first_episode: "{{ (list_out.episodes | default([])) | first | default('NO_EPISODES') }}"
+
+    - name: Warn when no episodes are returned
+      ansible.builtin.debug:
+        msg: "No episodes returned for the given criteria."
+      when: episode_count | int == 0

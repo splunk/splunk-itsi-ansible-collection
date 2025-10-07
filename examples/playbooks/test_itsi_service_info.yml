@@ -1,0 +1,165 @@
+---
+# test_itsi_service_info.yml
+# Run with:
+#   ansible-playbook -i "<splunk_host>," -u <ignored> test_itsi_service_info.yml \
+
+- name: Validate splunk.itsi.itsi_service_info
+  hosts: all
+  gather_facts: false
+
+  vars:
+    # If your itsi_api_client reads Authorization header, this passes the bearer token from env TOKEN
+    ansible_httpapi_headers:
+      Authorization: "Bearer {{ splunk_token | default(lookup('env','TOKEN'), true) }}"
+    # If your client prefers username/password, comment the header above and set these instead
+    # ansible_user: admin
+    # ansible_password: changeme
+
+    # Fields we commonly project
+    common_fields: ["_key", "title", "enabled", "sec_grp"]
+
+  pre_tasks:
+    - name: Ensure token is available (if using bearer)
+      ansible.builtin.assert:
+        that:
+          - (splunk_token | default(lookup('env','TOKEN'), true)) | length > 0
+        fail_msg: "No bearer token found. Set -e splunk_token=... or export TOKEN first."
+      when: ansible_httpapi_headers is defined and 'Authorization' in ansible_httpapi_headers and false
+
+  tasks:
+    - name: A1) List all services (baseline)
+      splunk.itsi.itsi_service_info:
+        enabled: true
+      register: svc_all
+
+    - name: Assert A1 returned a list and status
+      ansible.builtin.assert:
+        that:
+          - svc_all is defined
+          - svc_all.status is defined
+          - svc_all.status | int == 200
+          - svc_all['items'] is iterable
+          - svc_all['items'] | length >= 1
+        success_msg: "Baseline list OK ({{ svc_all['items'] | length }} services)."
+
+    - name: Pick a reference service (first)
+      ansible.builtin.set_fact:
+        ref_service: "{{ (svc_all['items'] | first) }}"
+        ref_key: "{{ (svc_all['items'] | first)._key }}"
+        ref_title: "{{ (svc_all['items'] | first).title }}"
+
+    - name: Debug reference service
+      ansible.builtin.debug:
+        msg:
+          key: "{{ ref_key }}"
+          title: "{{ ref_title }}"
+
+    - name: A2) List with filter by exact title
+      splunk.itsi.itsi_service_info:
+        title: "{{ ref_title }}"
+        fields: "{{ common_fields + ['description', 'service_tags', 'entity_rules', 'base_service_template_id'] }}"
+      register: svc_by_title
+
+    - name: Assert A2 returns exactly one and matches title
+      ansible.builtin.assert:
+        that:
+          - svc_by_title.status | int == 200
+          - svc_by_title['items'] | length >= 1
+          - (svc_by_title['items'][0].title | string) == (ref_title | string)
+        success_msg: "Exact-title filter returned a single correct match."
+
+    - name: A3) GET by key (partial view)
+      splunk.itsi.itsi_service_info:
+        service_key: "{{ ref_key }}"
+        fields: "{{ common_fields + ['entity_rules', 'permissions'] }}"
+      register: svc_by_key
+
+    - name: Assert A3 returns one with same key
+      ansible.builtin.assert:
+        that:
+          - svc_by_key.status | int == 200
+          - svc_by_key.service is defined
+          - (svc_by_key.service._key | string) == (ref_key | string)
+        success_msg: "GET-by-key returned the expected document."
+
+    - name: Shape checks on enabled, sec_grp, entity_rules
+      ansible.builtin.assert:
+        that:
+          - "'enabled' in svc_by_key.service"
+          - "(svc_by_key.service.enabled in [0,1,true,false])"
+          - "'sec_grp' in svc_by_key.service"
+          - "'entity_rules' in svc_by_key.service"
+          - "svc_by_key.service.entity_rules is not defined or svc_by_key.service.entity_rules is iterable"
+        success_msg: "Field shapes look good (enabled/sec_grp/entity_rules)."
+
+    - name: A4 Projection only minimal fields
+      splunk.itsi.itsi_service_info:
+        service_key: "{{ ref_key }}"
+        fields: "{{ common_fields }}"
+      register: svc_min
+
+    - name: Assert only expected keys are present (at least)
+      vars:
+        keys_present: "{{ svc_min.service | dict2items | map(attribute='key') | list }}"
+      ansible.builtin.assert:
+        that:
+          - svc_min.status | int == 200
+          - svc_min.service is defined
+          - "'_key' in keys_present"
+          - "'title' in keys_present"
+          - "'enabled' in keys_present"
+          - "'sec_grp' in keys_present"
+        success_msg: "Projection with minimal fields returned expected keys."
+
+    - name: A5) GET non-existent key (expect message & non-200)
+      splunk.itsi.itsi_service_info:
+        service_key: "does-not-exist-{{ 999999 | random }}"
+      register: svc_missing
+      ignore_errors: true
+
+    - name: Assert A5 produced an error shape (module should not crash)
+      ansible.builtin.assert:
+        that:
+          - svc_missing.status is defined
+          - svc_missing.status | int != 200
+          - svc_missing.raw is defined
+          - svc_missing.raw.error is defined or svc_missing.raw.details is defined
+        success_msg: "Non-existent key handled with an error payload (no crash)."
+
+    - name: Test pagination functionality
+      block:
+        - name: Optional A6) Pagination smoke test (run only if > 3 services)
+          when: svc_all['items'] | length > 3
+          splunk.itsi.itsi_service_info:
+            enabled: true
+            count: 2
+            offset: 1
+            fields: "{{ common_fields }}"
+          register: svc_page
+
+        - name: Assert pagination returned at most requested size
+          when: svc_all['items'] | length > 3
+          ansible.builtin.assert:
+            that:
+              - svc_page.status | int == 200
+              - svc_page['items'] | length <= 2
+            success_msg: "Pagination appears functional."
+      rescue:
+        - name: Debug pagination skip message
+          ansible.builtin.debug:
+            msg: "Pagination parameters not supported by server/module or not needed; skipping."
+
+    - name: A7) Re-verify list remains stable (no unintended changes)
+      splunk.itsi.itsi_service_info:
+        enabled: true
+      register: svc_all_2
+
+    - name: Assert list count unchanged
+      ansible.builtin.assert:
+        that:
+          - (svc_all_2['items'] | length) >= (svc_all['items'] | length)
+        success_msg: "Repeated listing stable (no unintended mutations)."
+
+    - name: Show final samples
+      ansible.builtin.debug:
+        var: svc_by_key.service

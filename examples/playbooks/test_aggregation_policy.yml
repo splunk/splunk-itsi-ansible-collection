@@ -1,0 +1,352 @@
+---
+# Test playbook for itsi_aggregation_policy module
+# Tests comprehensive CRUD operations with EMI API
+
+- name: "Test ITSI Aggregation Policy Module - Comprehensive CRUD"
+  hosts: all
+  gather_facts: false
+  vars:
+    test_policy_title: "ZZ Test Aggregation Policy (Ansible)"
+    test_policy_description: "Test policy created by Ansible for CRUD testing"
+
+  tasks:
+    # Phase 1: List operations
+    - name: "Phase 1.1: List all aggregation policies"
+      splunk.itsi.itsi_aggregation_policy:
+        state: query
+      register: result_all_policies
+
+    - name: "Phase 1.1: Verify all policies list"
+      ansible.builtin.assert:
+        that:
+          - result_all_policies.status == 200
+          - result_all_policies.aggregation_policies is defined
+        success_msg: "All aggregation policies retrieved successfully"
+        fail_msg: "Failed to retrieve all aggregation policies"
+
+    # Phase 1.2: Test filtering (currently disabled due to server error)
+    # - name: "Phase 1.2: List only enabled aggregation policies"
+    #   splunk.itsi.itsi_aggregation_policy:
+    #     state: query
+    #     filter_data:
+    #       disabled: 0
+    #     limit: 5
+    #   register: result_enabled_policies
+
+    # Phase 2: Query operations
+    - name: "Phase 2.1: Query specific aggregation policy (should not exist yet)"
+      splunk.itsi.itsi_aggregation_policy:
+        state: query
+        title: "{{ test_policy_title }}"
+      register: result_nonexistent_policy
+
+    - name: "Phase 2.1: Verify policy doesn't exist"
+      ansible.builtin.assert:
+        that:
+          - result_nonexistent_policy.status == 404
+        fail_msg: "Expected 404 but got {{ result_nonexistent_policy.status }}"
+
+    - name: "Phase 2.2: Query existing aggregation policy by key"
+      splunk.itsi.itsi_aggregation_policy:
+        state: query
+        policy_id: "kpi_alerting_policy"
+      register: result_existing_policy
+
+    - name: "Phase 2.2: Verify existing policy query"
+      ansible.builtin.assert:
+        that:
+          - result_existing_policy.status == 200
+        fail_msg: "Expected 200 but got {{ result_existing_policy.status }}"
+
+    # Phase 3: Create operation
+    - name: "Phase 3.1: Create new aggregation policy"
+      splunk.itsi.itsi_aggregation_policy:
+        state: present
+        title: "{{ test_policy_title }}"
+        description: "Created by Ansible for CRUD testing"
+        disabled: 0
+        priority: 5
+        split_by_field: "source"
+        group_title: "%title%"
+        group_description: "%description%"
+        group_severity: "%severity%"
+        group_status: "%status%"
+        group_assignee: "%owner%"
+        filter_criteria:
+          condition: "OR"
+          items: []
+        breaking_criteria:
+          condition: "OR"
+          items:
+            - type: "pause"
+              config:
+                limit: "7200"
+        rules: []
+      register: result_create_policy
+
+    - name: "Phase 3.1: Verify policy creation"
+      ansible.builtin.assert:
+        that:
+          - result_create_policy.changed == true
+          - result_create_policy.aggregation_policy._key is defined
+
+    - name: "Phase 3.2: Verify created policy exists by querying with key"
+      splunk.itsi.itsi_aggregation_policy:
+        state: query
+        policy_id: "{{ result_create_policy.aggregation_policy._key }}"
+      register: verify_create_result
+
+    - name: "Phase 3.2: Verify policy was created correctly"
+      ansible.builtin.assert:
+        that:
+          - verify_create_result.status == 200
+          - verify_create_result.aggregation_policy is not none
+          - verify_create_result.aggregation_policy.title == "ZZ Test Aggregation Policy (Ansible)"
+        fail_msg: "Created policy verification failed"
+
+    # Phase 4: Update operations
+    - name: "Phase 4.1: Update aggregation policy (should detect changes)"
+      splunk.itsi.itsi_aggregation_policy:
+        policy_id: "{{ result_create_policy.aggregation_policy._key }}"
+        title: "{{ test_policy_title }}"
+        description: "UPDATED via partial payload"
+        group_severity: "critical"
+        disabled: 1
+        state: present
+      register: update_result
+
+    - name: "Phase 4.1: Verify policy update"
+      ansible.builtin.assert:
+        that:
+          - update_result.changed == true
+          - update_result.status == 200
+          - update_result.operation == "update"
+          - update_result.diff is defined
+        fail_msg: "Update aggregation policy failed"
+
+    - name: "Phase 4.2: Verify updated policy by querying"
+      splunk.itsi.itsi_aggregation_policy:
+        policy_id: "{{ result_create_policy.aggregation_policy._key }}"
+        state: query
+      register: verify_update_result
+
+    - name: "Phase 4.2: Verify policy was updated correctly"
+      ansible.builtin.assert:
+        that:
+          - verify_update_result.status == 200
+          - verify_update_result.aggregation_policy.description == "UPDATED via partial payload"
+          - verify_update_result.aggregation_policy.group_severity == "critical"
+          - verify_update_result.aggregation_policy.disabled == 1
+        fail_msg: "Updated policy verification failed"
+
+    - name: "Phase 4.3: Update with no changes (idempotency test)"
+      splunk.itsi.itsi_aggregation_policy:
+        policy_id: "{{ result_create_policy.aggregation_policy._key }}"
+        title: "{{ test_policy_title }}"
+        description: "UPDATED via partial payload"
+        group_severity: "critical"
+        disabled: 1
+        state: present
+      register: idempotent_result
+
+    - name: "Phase 4.3: Verify idempotency"
+      ansible.builtin.assert:
+        that:
+          - idempotent_result.changed == false
+          - idempotent_result.status == 200
+          - idempotent_result.operation == "no_change"
+        fail_msg: "Idempotency test failed"
+
+    - name: "Phase 4.4: Update using additional_fields"
+      splunk.itsi.itsi_aggregation_policy:
+        policy_id: "{{ result_create_policy.aggregation_policy._key }}"
+        title: "{{ test_policy_title }}"
+        additional_fields:
+          split_by_field: "host,severity"
+          sub_group_limit: "50"
+        state: present
+      register: additional_fields_result
+
+    - name: "Phase 4.4: Verify additional fields update"
+      ansible.builtin.assert:
+        that:
+          - additional_fields_result.changed == true
+          - additional_fields_result.status == 200
+          - additional_fields_result.operation == "update"
+        fail_msg: "Additional fields update failed"
+
+    # Phase 5: Delete operation
+    - name: "Phase 5.1: Delete aggregation policy"
+      splunk.itsi.itsi_aggregation_policy:
+        policy_id: "{{ result_create_policy.aggregation_policy._key }}"
+        state: absent
+      register: delete_result
+
+    - name: "Phase 5.1: Verify policy deletion"
+      ansible.builtin.assert:
+        that:
+          - delete_result.changed == true
+          - delete_result.status == 204
+          - delete_result.operation == "delete"
+        fail_msg: "Delete aggregation policy failed"
+
+    - name: "Phase 5.2: Verify policy no longer exists"
+      splunk.itsi.itsi_aggregation_policy:
+        title: "{{ test_policy_title }}"
+        state: query
+      register: verify_delete_result
+
+    - name: "Phase 5.2: Verify policy was deleted"
+      ansible.builtin.assert:
+        that:
+          - verify_delete_result.status == 404
+          - verify_delete_result.aggregation_policy is none
+        fail_msg: "Delete verification failed"
+
+    - name: "Phase 5.3: Delete non-existent policy (idempotency test)"
+      splunk.itsi.itsi_aggregation_policy:
+        title: "{{ test_policy_title }}"
+        state: absent
+      register: delete_idempotent_result
+
+    - name: "Phase 5.3: Verify delete idempotency"
+      ansible.builtin.assert:
+        that:
+          - delete_idempotent_result.changed == false
+          - delete_idempotent_result.status == 404
+          - delete_idempotent_result.operation == "no_change"
+        fail_msg: "Delete idempotency test failed"
+
+    # Phase 6: Error handling
+    - name: "Phase 6.1: Test query with invalid policy ID"
+      splunk.itsi.itsi_aggregation_policy:
+        policy_id: "non_existent_policy_id_12345"
+        state: query
+      register: error_query_result
+
+    - name: "Phase 6.1: Verify error handling for invalid policy"
+      ansible.builtin.assert:
+        that:
+          - error_query_result.status == 404
+          - error_query_result.aggregation_policy is none
+        fail_msg: "Error handling for invalid policy failed"
+
+    # Phase 7: Check mode testing
+    - name: "Phase 7.1: Test check mode for create operation"
+      splunk.itsi.itsi_aggregation_policy:
+        title: "Check Mode Test Policy"
+        description: "This should not be created in check mode"
+        group_severity: "low"
+        state: present
+      check_mode: true
+      register: check_create_result
+
+    - name: "Phase 7.1: Verify check mode create"
+      ansible.builtin.assert:
+        that:
+          - check_create_result.changed == true
+          - check_create_result.operation == "create"
+        fail_msg: "Check mode create test failed"
+
+    - name: "Phase 7.2: Verify check mode didn't create policy"
+      splunk.itsi.itsi_aggregation_policy:
+        title: "Check Mode Test Policy"
+        state: query
+      register: check_verify_result
+
+    - name: "Phase 7.2: Verify policy wasn't created in check mode"
+      ansible.builtin.assert:
+        that:
+          - check_verify_result.status == 404
+        fail_msg: "Check mode verification failed - policy was created"
+
+    # Phase 8: Field projection testing
+    - name: "Phase 8.1: Query with specific fields"
+      splunk.itsi.itsi_aggregation_policy:
+        policy_id: "kpi_alerting_policy"
+        state: query
+        fields:
+          - title
+          - disabled
+          - priority
+      register: fields_result
+
+    - name: "Phase 8.1: Verify field projection worked"
+      ansible.builtin.assert:
+        that:
+          - fields_result.status == 200
+          - fields_result.aggregation_policy.title is defined
+        fail_msg: "Field projection test failed"
+
+    # Phase 9: Complex policy testing
+    - name: "Phase 9.1: Create policy with complex criteria"
+      splunk.itsi.itsi_aggregation_policy:
+        title: "Complex Test Policy (Ansible)"
+        description: "Policy with complex filter and breaking criteria"
+        disabled: 0
+        priority: 4
+        split_by_field: "source"
+        group_title: "%title%"
+        group_description: "%description%"
+        group_severity: "%severity%"
+        group_status: "%status%"
+        group_assignee: "%owner%"
+        filter_criteria:
+          condition: "OR"
+          items:
+            - type: "clause"
+              config:
+                condition: "AND"
+                items:
+                  - type: "notable_event_field"
+                    config:
+                      field: "severity"
+                      operator: "="
+                      value: "6"
+        breaking_criteria:
+          condition: "OR"
+          items:
+            - type: "pause"
+              config:
+                limit: "7200"
+        rules: []
+        state: present
+      register: complex_create_result
+
+    - name: "Phase 9.1: Verify complex policy creation"
+      ansible.builtin.assert:
+        that:
+          - complex_create_result.changed == true
+          - complex_create_result.status == 200
+        fail_msg: "Complex policy creation failed"
+
+    - name: "Phase 9.2: Clean up complex policy"
+      splunk.itsi.itsi_aggregation_policy:
+        policy_id: "{{ complex_create_result.aggregation_policy._key }}"
+        state: absent
+      register: complex_cleanup_result
+
+    - name: "Phase 9.2: Verify complex policy cleanup"
+      ansible.builtin.assert:
+        that:
+          - complex_cleanup_result.changed == true
+          - complex_cleanup_result.status == 204
+        fail_msg: "Complex policy cleanup failed"
+
+    # Phase 10: Final summary
+    - name: "Phase 10: Test Summary"
+      ansible.builtin.debug:
+        msg:
+          - "===== ITSI Aggregation Policy Module Test Results ====="
+          - "✓ List operations: SUCCESS"
+          - "✓ Query operations: SUCCESS"
+          - "✓ Create operation: SUCCESS"
+          - "✓ Update operations: SUCCESS"
+          - "✓ Delete operation: SUCCESS"
+          - "✓ Error handling: SUCCESS"
+          - "✓ Check mode: SUCCESS"
+          - "✓ Field projection: SUCCESS"
+          - "✓ Complex policy: SUCCESS"
+          - "✓ Idempotency: SUCCESS"
+          - "=================================================="
+          - "All tests completed successfully!"

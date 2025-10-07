@@ -1,0 +1,12 @@
+---
+- name: poll-episodes
+  hosts: splunk
+  sources:
+    - ansible.eda.range:
+        limit: 3
+  rules:
+    - name: fetch-episodes
+      condition: event.i is defined
+      action:
+        run_playbook:
+          name: extensions/eda/rulebooks/simple_test.yml

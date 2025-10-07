@@ -1,0 +1,30 @@
+---
+- name: Test add_episode_comments module
+  hosts: splunk
+  gather_facts: false
+
+  vars:
+    test_episode_id: "ff942149-4e70-42ff-94d3-6fdf5c5f95f3"
+    test_comment: "Second test comment - Root cause identified and resolved"
+
+  tasks:
+    - name: Add comment to test episode
+      splunk.itsi.add_episode_comments:
+        event_id: "{{ test_episode_id }}"
+        comment: "{{ test_comment }}"
+        is_group: true
+      register: add_comment_result
+
+    - name: Show add comment result
+      ansible.builtin.debug:
+        var: add_comment_result
+
+    - name: Check if comment was added successfully
+      ansible.builtin.debug:
+        msg: "Comment added successfully with status {{ add_comment_result.status }}"
+      when: add_comment_result.status == 200
+
+    - name: Show error if comment failed
+      ansible.builtin.debug:
+        msg: "Failed to add comment: {{ add_comment_result.body }}"
+      when: add_comment_result.status != 200

@@ -1,0 +1,135 @@
+---
+- name: "Comprehensive ITSI Episode Testing - Enhanced Response Validation"
+  hosts: all
+  gather_facts: false
+  vars:
+    # Test parameters
+    test_limit: 5
+    test_fields: "_key,status,severity,owner"
+    test_filter_data: '{"status":"1"}'  # Open episodes only
+
+  tasks:
+    - name: "Test 1: List episodes with limit (verifies enhanced response structure)"
+      splunk.itsi.notable_event_group_info:
+        limit: "{{ test_limit }}"
+        fields: "{{ test_fields }}"
+      register: list_result
+
+    - name: "Validate Test 1 - Enhanced response structure"
+      ansible.builtin.assert:
+        that:
+          - list_result is defined
+          - list_result.status is defined
+          - list_result.status == 200
+          - list_result.episodes is defined
+          - list_result.episodes | type_debug == 'list'
+          - list_result.raw is defined
+          - list_result.changed == false
+        fail_msg: "Test 1 failed: Enhanced response structure validation"
+        success_msg: "Test 1 passed: Enhanced response structure is correct"
+
+    - name: "Test 2: Count episodes with filter (verifies count endpoint)"
+      splunk.itsi.notable_event_group_info:
+        count_only: true
+        filter_data: "{{ test_filter_data }}"
+      register: count_result
+
+    - name: "Validate Test 2 - Count endpoint response"
+      ansible.builtin.assert:
+        that:
+          - count_result is defined
+          - count_result.status is defined
+          - count_result.status == 200
+          - count_result.count is defined
+          - count_result.count | type_debug == 'int'
+          - count_result.count >= 0
+          - count_result.episodes is not defined  # Should not exist for count_only
+        fail_msg: "Test 2 failed: Count endpoint validation"
+        success_msg: "Test 2 passed: Count endpoint works correctly"
+
+    - name: "Test 3: Get single episode by ID (if episodes exist)"
+      splunk.itsi.notable_event_group_info:
+        episode_id: "{{ list_result.episodes[0]._key }}"
+      register: single_result
+      when: list_result.episodes | length > 0
+
+    - name: "Validate Test 3 - Single episode retrieval"
+      ansible.builtin.assert:
+        that:
+          - single_result is defined
+          - single_result.status is defined
+          - single_result.status == 200
+          - single_result.episodes is defined
+          - single_result.episodes | length <= 1
+          - single_result.episodes[0]._key is defined
+        fail_msg: "Test 3 failed: Single episode retrieval validation"
+        success_msg: "Test 3 passed: Single episode retrieval works correctly"
+      when: list_result.episodes | length > 0
+
+    - name: "Test 4: List with sorting and filtering (advanced parameters)"
+      splunk.itsi.notable_event_group_info:
+        limit: 3
+        filter_data: "{{ test_filter_data }}"
+        sort_key: "mod_time"
+        sort_dir: 0  # Descending (newest first)
+      register: sorted_result
+
+    - name: "Validate Test 4 - Advanced parameters"
+      ansible.builtin.assert:
+        that:
+          - sorted_result is defined
+          - sorted_result.status is defined
+          - sorted_result.status == 200
+          - sorted_result.episodes is defined
+          - sorted_result.episodes | length <= 3
+        fail_msg: "Test 4 failed: Advanced parameters validation"
+        success_msg: "Test 4 passed: Advanced parameters work correctly"
+
+    - name: "Test 5: Error handling - Invalid episode ID"
+      splunk.itsi.notable_event_group_info:
+        episode_id: "invalid-episode-id-12345"
+      register: error_result
+      failed_when: false  # Don't fail the task on expected error
+
+    - name: "Validate Test 5 - Error handling"
+      ansible.builtin.assert:
+        that:
+          - error_result is defined
+          - error_result.status is defined
+          - error_result.status == 200  # Splunk returns 200 with empty result for non-existent IDs
+          - error_result.episodes is defined
+          - error_result.episodes | length == 0  # No episodes for invalid ID
+        fail_msg: "Test 5 failed: Error handling validation"
+        success_msg: "Test 5 passed: Error handling works correctly (empty result for invalid ID)"
+
+    # Summary and connection type detection
+    - name: "Detect connection type"
+      ansible.builtin.set_fact:
+        connection_type: "{{ 'netcommon' if ansible_connection == 'ansible.netcommon.httpapi' else 'core' }}"
+
+    - name: "Test Results Summary"
+      ansible.builtin.debug:
+        msg:
+          - "=== Enhanced Response Testing Complete ==="
+          - "Connection Type: {{ connection_type | upper }} httpapi"
+          - "Host: {{ inventory_hostname }}"
+          - "Test 1 (List): {{ 'PASSED' if list_result.status == 200 else 'FAILED' }}"
+          - "Test 2 (Count): {{ 'PASSED' if count_result.status == 200 else 'FAILED' }}"
+          - "Test 3 (Single): {{ 'PASSED' if (single_result.status | default(200)) == 200 else 'FAILED' }}"
+          - "Test 4 (Advanced): {{ 'PASSED' if sorted_result.status == 200 else 'FAILED' }}"
+          - "Test 5 (Error): {{ 'PASSED' if error_result.status == 200 and (error_result.episodes | length == 0) else 'FAILED' }}"
+          - "Total Episodes Found: {{ list_result.episodes | length }}"
+          - "Total Open Episodes: {{ count_result.count }}"
+          - "Enhanced Response Format: ENABLED (Default)"
+
+    - name: "Connection-Specific Details"
+      ansible.builtin.debug:
+        msg:
+          - "=== Connection Details ==="
+          - "HTTP Status Access: ✅ Available ({{ list_result.status }})"
+          - "Raw Response Access: ✅ Available"
+          - "Episode Data Type: {{ list_result.episodes | type_debug }}"
+          - "Enhanced Envelope: ✅ Working"
+          - "Authentication: Bearer Token"
+          - "SSL: {{ ansible_httpapi_use_ssl | default('unknown') }}"
+          - "Port: {{ ansible_httpapi_port | default('unknown') }}"

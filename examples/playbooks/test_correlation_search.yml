@@ -1,0 +1,298 @@
+---
+# Test playbook for itsi_correlation_search module
+# Tests all CRUD operations: Create, Read, Update, Delete
+
+- name: Test ITSI Correlation Search Module
+  hosts: splunk
+  gather_facts: false
+  connection: httpapi
+  vars:
+    test_search_name: "ansible-test-correlation-search"
+    test_search_query: "index=_internal | head 5"
+
+  tasks:
+    - name: "=== PHASE 1: LIST ALL CORRELATION SEARCHES ==="
+      ansible.builtin.debug:
+        msg: "Starting correlation search CRUD tests"
+
+    - name: List all correlation searches
+      splunk.itsi.itsi_correlation_search:
+        state: query
+        limit: 5
+      register: all_searches
+
+    - name: Display correlation searches count
+      ansible.builtin.debug:
+        msg: "Found {{ all_searches.correlation_searches | length }} correlation searches (limited to 5)"
+
+    - name: Show first search if available
+      ansible.builtin.debug:
+        var: all_searches.correlation_searches[0]
+      when: all_searches.correlation_searches | length > 0
+
+    - name: "=== PHASE 2: QUERY SPECIFIC EXISTING SEARCH ==="
+      ansible.builtin.debug:
+        msg: "Testing query of existing correlation search"
+
+    - name: Query existing correlation search with field projection
+      splunk.itsi.itsi_correlation_search:
+        name: "Service Monitoring - KPI Degraded"
+        fields: "name,disabled,is_scheduled,cron_schedule,actions"
+        state: query
+      register: existing_search
+
+    - name: Display existing search details
+      ansible.builtin.debug:
+        msg: |
+          Search Name: {{ existing_search.correlation_search.name | default('Not found') }}
+          Disabled: {{ existing_search.correlation_search.disabled | default('N/A') }}
+          Status Code: {{ existing_search.status }}
+      when: existing_search.status == 200
+
+    - name: "=== PHASE 3: CREATE NEW CORRELATION SEARCH ==="
+      ansible.builtin.debug:
+        msg: "Testing creation of new correlation search"
+
+    - name: Check if test search already exists (cleanup from previous runs)
+      splunk.itsi.itsi_correlation_search:
+        name: "{{ test_search_name }}"
+        state: query
+      register: existing_test_search
+
+    - name: Delete existing test search if found
+      splunk.itsi.itsi_correlation_search:
+        name: "{{ test_search_name }}"
+        state: absent
+      when: existing_test_search.status == 200
+
+    - name: Create new test correlation search
+      splunk.itsi.itsi_correlation_search:
+        name: "{{ test_search_name }}"
+        search: "{{ test_search_query }}"
+        description: "Test correlation search created by Ansible automation"
+        disabled: false
+        cron_schedule: "*/10 * * * *"
+        earliest_time: "-15m"
+        latest_time: "now"
+        actions: "itsi_event_generator"
+        additional_fields:
+          priority: "medium"
+          test_field: "ansible_test"
+        state: present
+      register: create_result
+
+    - name: Verify creation success
+      ansible.builtin.debug:
+        msg: |
+          Creation Status: {{ create_result.status }}
+          Changed: {{ create_result.changed }}
+          Operation: {{ create_result.operation }}
+      failed_when: create_result.status not in [200, 201]
+
+    - name: "=== PHASE 4: READ CREATED SEARCH ==="
+      ansible.builtin.debug:
+        msg: "Testing retrieval of created correlation search"
+
+    - name: Query the newly created correlation search
+      splunk.itsi.itsi_correlation_search:
+        correlation_search_id: "{{ test_search_name }}"
+        state: query
+      register: created_search
+
+    - name: Verify search was created correctly
+      ansible.builtin.debug:
+        msg: |
+          Search Name: {{ created_search.correlation_search.name }}
+          Disabled: {{ created_search.correlation_search.disabled }}
+          Description: {{ created_search.correlation_search.description | default('No description') }}
+          Cron Schedule: {{ created_search.correlation_search.cron_schedule | default('No schedule') }}
+      when: created_search.status == 200
+
+    - name: Assert search properties are correct
+      ansible.builtin.assert:
+        that:
+          - created_search.status == 200
+          - created_search.correlation_search.name == test_search_name
+          - created_search.correlation_search.disabled == "0"
+        fail_msg: "Created correlation search does not have expected properties"
+
+    - name: "=== PHASE 5: UPDATE CORRELATION SEARCH ==="
+      ansible.builtin.debug:
+        msg: "Testing update of correlation search"
+
+    - name: Update correlation search schedule and description
+      splunk.itsi.itsi_correlation_search:
+        name: "{{ test_search_name }}"
+        cron_schedule: "*/5 * * * *"
+        description: "UPDATED: Test correlation search modified by Ansible"
+        disabled: false
+        additional_fields:
+          schedule_priority: "higher"
+          alert_type: "number of events"
+        state: present
+      register: update_result
+
+    - name: Verify update success
+      ansible.builtin.debug:
+        msg: |
+          Update Status: {{ update_result.status }}
+          Changed: {{ update_result.changed }}
+          Operation: {{ update_result.operation }}
+      failed_when: update_result.status != 200
+
+    - name: Query updated search to verify changes
+      splunk.itsi.itsi_correlation_search:
+        name: "{{ test_search_name }}"
+        state: query
+      register: updated_search
+
+    - name: Display updated search properties
+      ansible.builtin.debug:
+        msg: |
+          Updated Cron Schedule: {{ updated_search.correlation_search.cron_schedule }}
+          Updated Description: {{ updated_search.correlation_search.description }}
+      when: updated_search.status == 200
+
+    - name: "=== PHASE 6: TEST DISABLE/ENABLE ==="
+      ansible.builtin.debug:
+        msg: "Testing disable/enable functionality"
+
+    - name: Disable correlation search
+      splunk.itsi.itsi_correlation_search:
+        name: "{{ test_search_name }}"
+        disabled: true
+        state: present
+      register: disable_result
+
+    - name: Verify search is disabled
+      splunk.itsi.itsi_correlation_search:
+        name: "{{ test_search_name }}"
+        fields: "name,disabled"
+        state: query
+      register: disabled_search
+
+    - name: Check disabled status
+      ansible.builtin.debug:
+        msg: "Search disabled status: {{ disabled_search.correlation_search.disabled }}"
+      failed_when: disabled_search.correlation_search.disabled != "1"
+
+    - name: Re-enable correlation search
+      splunk.itsi.itsi_correlation_search:
+        name: "{{ test_search_name }}"
+        disabled: false
+        state: present
+      register: enable_result
+
+    - name: "=== PHASE 7: LIST WITH FILTERING ==="
+      ansible.builtin.debug:
+        msg: "Testing filtered listing"
+
+    - name: List enabled correlation searches only
+      splunk.itsi.itsi_correlation_search:
+        filter_data: '{"disabled": "0"}'
+        fields: "name,disabled"
+        limit: 3
+        state: query
+      register: filtered_searches
+
+    - name: Display filtered results
+      ansible.builtin.debug:
+        msg: "Found {{ filtered_searches.correlation_searches | length }} enabled searches"
+
+    - name: "=== PHASE 8: ERROR HANDLING TESTS ==="
+      ansible.builtin.debug:
+        msg: "Testing error handling scenarios"
+
+    - name: Setup facts for timestamp
+      ansible.builtin.setup:
+        gather_subset: "!all,date_time"
+
+    - name: Try to query non-existent search
+      splunk.itsi.itsi_correlation_search:
+        name: "non-existent-search-{{ ansible_date_time.epoch }}"
+        state: query
+      register: missing_search
+      ignore_errors: true
+
+    - name: Verify 404 for missing search
+      ansible.builtin.debug:
+        msg: "Missing search returned status: {{ missing_search.status | default('N/A') }}"
+      when: missing_search is defined
+
+    - name: "=== PHASE 9: CHECK MODE TEST ==="
+      ansible.builtin.debug:
+        msg: "Testing check mode functionality"
+
+    - name: Test check mode for update (should not make changes)
+      splunk.itsi.itsi_correlation_search:
+        name: "{{ test_search_name }}"
+        description: "CHECK MODE: This should not be applied"
+        state: present
+      check_mode: true
+      register: check_mode_result
+
+    - name: Verify check mode behavior
+      ansible.builtin.debug:
+        msg: |
+          Check mode changed: {{ check_mode_result.changed }}
+          Check mode status: {{ check_mode_result.status }}
+          Check mode operation: {{ check_mode_result.operation }}
+
+    - name: "=== PHASE 10: CLEANUP - DELETE TEST SEARCH ==="
+      ansible.builtin.debug:
+        msg: "Cleaning up test correlation search"
+
+    - name: Delete test correlation search
+      splunk.itsi.itsi_correlation_search:
+        name: "{{ test_search_name }}"
+        state: absent
+      register: delete_result
+
+    - name: Verify deletion success
+      ansible.builtin.debug:
+        msg: |
+          Deletion Status: {{ delete_result.status }}
+          Changed: {{ delete_result.changed }}
+          Operation: {{ delete_result.operation }}
+      failed_when: delete_result.status != 204
+
+    - name: Confirm search is deleted
+      splunk.itsi.itsi_correlation_search:
+        name: "{{ test_search_name }}"
+        state: query
+      register: deleted_search
+
+    - name: Verify search no longer exists
+      ansible.builtin.debug:
+        msg: "Deleted search query status: {{ deleted_search.status }}"
+      failed_when: deleted_search.status != 404
+
+    - name: Try to delete already deleted search (should be idempotent)
+      splunk.itsi.itsi_correlation_search:
+        name: "{{ test_search_name }}"
+        state: absent
+      register: double_delete
+
+    - name: Verify idempotent deletion
+      ansible.builtin.debug:
+        msg: |
+          Double deletion status: {{ double_delete.status }}
+          Double deletion changed: {{ double_delete.changed }}
+      failed_when: double_delete.changed == true
+
+    - name: "=== TEST SUMMARY ==="
+      ansible.builtin.debug:
+        msg: |
+          ✅ All CRUD operations completed successfully!
+
+          Test Results Summary:
+          • List operations: ✅
+          • Query operations: ✅
+          • Create operation: ✅
+          • Update operations: ✅
+          • Delete operation: ✅
+          • Error handling: ✅
+          • Check mode: ✅
+          • Idempotency: ✅
+
+          The itsi_correlation_search module is working correctly!

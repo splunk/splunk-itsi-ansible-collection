@@ -1,0 +1,70 @@
+---
+- name: Test update_episode_details module
+  hosts: splunk
+  gather_facts: false
+  vars:
+    test_episode_id: "f904e579-b5ee-44aa-9237-1726d33dc68d"  # Episode that exists in the system
+
+  tasks:
+    - name: Update episode severity to critical
+      splunk.itsi.update_episode_details:
+        episode_id: "{{ test_episode_id }}"
+        severity: "6"
+      register: severity_update_result
+
+    - name: Show severity update result
+      ansible.builtin.debug:
+        var: severity_update_result
+
+    - name: Update episode status and owner
+      splunk.itsi.update_episode_details:
+        episode_id: "{{ test_episode_id }}"
+        status: "2"
+        owner: "admin"
+      register: status_owner_update_result
+
+    - name: Show status and owner update result
+      ansible.builtin.debug:
+        var: status_owner_update_result
+
+    - name: Update multiple fields including instruction
+      splunk.itsi.update_episode_details:
+        episode_id: "{{ test_episode_id }}"
+        severity: "4"
+        status: "3"
+        instruction: "Updated via Ansible - investigating root cause"
+      register: multi_field_update_result
+
+    - name: Show multi-field update result
+      ansible.builtin.debug:
+        var: multi_field_update_result
+
+    - name: Update using fields dictionary
+      splunk.itsi.update_episode_details:
+        episode_id: "{{ test_episode_id }}"
+        fields:
+          severity: "3"
+          owner: "analyst"
+      register: fields_dict_update_result
+
+    - name: Show fields dictionary update result
+      ansible.builtin.debug:
+        var: fields_dict_update_result
+
+    - name: Check if all updates were successful
+      ansible.builtin.debug:
+        msg: "All episode updates completed successfully"
+      when:
+        - severity_update_result.status == 200
+        - status_owner_update_result.status == 200
+        - multi_field_update_result.status == 200
+        - fields_dict_update_result.status == 200
+
+    - name: Show any errors
+      ansible.builtin.debug:
+        msg: "Some updates failed - check individual task results"
+      when: >
+        severity_update_result.status != 200 or
+        status_owner_update_result.status != 200 or
+        multi_field_update_result.status != 200 or
+        fields_dict_update_result.status != 200
