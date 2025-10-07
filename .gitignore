@@ -204,3 +204,7 @@ examples/**/*_local.*
 
 # GitHub workflows (to be added separately)
 .github/
+
+# Exclude default stuff added via ansible-creator
+plugins/action
+plugins/cache
