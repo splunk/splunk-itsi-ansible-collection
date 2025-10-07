@@ -193,3 +193,9 @@ experiments/
 examples/debug/
 *.debug
 debug.log
+
+# Local development files with sensitive data
+*.local
+*_local.*
+examples/inventory/*.local
+examples/**/*_local.*
