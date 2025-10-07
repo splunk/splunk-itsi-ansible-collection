@@ -79,6 +79,28 @@ ansible-galaxy collection install -r requirements.yml
 ansible-galaxy collection install splunk.itsi:==1.0.0
 ```
 
+## Building & Testing
+
+### Build the collection
+```bash
+ansible-galaxy collection build
+```
+
+### View module documentation
+```bash
+# View documentation for a specific module
+ansible-doc splunk.itsi.notable_event_group_info
+ansible-doc splunk.itsi.update_episode_details
+ansible-doc splunk.itsi.add_episode_comments
+ansible-doc splunk.itsi.itsi_service
+ansible-doc splunk.itsi.itsi_service_info
+ansible-doc splunk.itsi.itsi_correlation_search
+ansible-doc splunk.itsi.itsi_aggregation_policy
+
+# List all modules in the collection
+ansible-doc -l splunk.itsi
+```
+
 ## Quick Start
 
 ### 1. Configure Connection
